@@ -46,6 +46,10 @@ export class AerobikeController {
   // 平均値計算用
   private speedHistory: number[] = [];
   private cadenceHistory: number[] = [];
+  
+  // 負荷制御用
+  private lastSetResistance: number | null = null;
+  private resistanceOverrideTime: number | null = null;
   private maxHistoryLength: number = 10;
 
   // Bluetooth UUIDs
@@ -62,7 +66,7 @@ export class AerobikeController {
       distance: 0,
       power: 0,
       averagePower: 0,
-      resistance: 0,
+      resistance: 20, // デフォルト値を20に設定
       timestamp: new Date()
     };
 
@@ -391,7 +395,19 @@ export class AerobikeController {
 
       // Resistance Level (bit 5)
       if ((flags & 0x20) && offset + 2 <= data.length) {
-        this.currentMetrics.resistance = data.readInt16LE(offset);
+        const resistanceLevel = data.readInt16LE(offset);
+        
+        // 手動設定された負荷がある場合は上書きを防ぐ
+        const now = Date.now();
+        if (this.lastSetResistance !== null && this.resistanceOverrideTime && 
+            now - this.resistanceOverrideTime < 10000) { // 10秒間はハードウェア値を無視
+          console.log(`🔒 Manual resistance override active: keeping ${this.lastSetResistance} (ignoring hardware ${resistanceLevel})`);
+          this.currentMetrics.resistance = this.lastSetResistance;
+        } else {
+          // 手動設定がない、または時間が経過した場合はハードウェア値を使用
+          this.currentMetrics.resistance = resistanceLevel;
+          console.log(`📊 Hardware resistance level: ${resistanceLevel}`);
+        }
         offset += 2;
       }
 
@@ -475,6 +491,7 @@ export class AerobikeController {
 
   async setResistanceLevel(level: number): Promise<OperationResult> {
     if (!this.controlPointCharacteristic) {
+      console.log('❌ Control Point characteristic not available');
       return {
         success: false,
         error: 'Control Point characteristic not available'
@@ -482,6 +499,7 @@ export class AerobikeController {
     }
 
     if (level < 1 || level > 80) {
+      console.log(`❌ Invalid resistance level: ${level} (must be 1-80)`);
       return {
         success: false,
         error: 'Resistance level must be between 1 and 80'
@@ -490,39 +508,45 @@ export class AerobikeController {
 
     try {
       console.log(`🔧 Setting resistance level: ${level}`);
+      console.log('📋 Executing full control sequence...');
+      
+      // Step 1: 制御権要求
+      console.log('🎛️ Step 1/3: Requesting control...');
+      const controlResult = await this.requestControl();
+      if (!controlResult.success) {
+        console.log(`❌ Step 1 failed: ${controlResult.error}`);
+        return controlResult;
+      }
+      console.log('✅ Step 1 completed: Control granted');
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // First try to request control of the fitness machine
-      await this.requestControl();
+      // Step 2: 機器開始
+      console.log('▶️ Step 2/3: Starting/resuming machine...');
+      const startResult = await this.startResume();
+      if (!startResult.success) {
+        console.log(`❌ Step 2 failed: ${startResult.error}`);
+        return startResult;
+      }
+      console.log('✅ Step 2 completed: Machine started');
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // OpCode 0x04: Set Target Resistance Level
-      const command = Buffer.from([
-        0x04,                    // OpCode
-        level & 0xFF,           // Low byte
-        (level >> 8) & 0xFF     // High byte
-      ]);
-
-      console.log(`📡 Sending resistance command: ${command.toString('hex')}`);
-
-      // Try writeWithoutResponse first (many fitness machines prefer this)
-      await new Promise<void>((resolve, reject) => {
-        this.controlPointCharacteristic.write(command, true, (error: any) => {
-          if (error) {
-            console.log('⚠️ Write without response failed, trying with response...');
-            // Fallback to write with response
-            this.controlPointCharacteristic.write(command, false, (error2: any) => {
-              if (error2) reject(error2);
-              else resolve();
-            });
-          } else {
-            resolve();
-          }
-        });
-      });
-
-      console.log('✅ Resistance command sent');
-      return {
-        success: true
-      };
+      // Step 3: 負荷設定
+      console.log(`🎯 Step 3/3: Setting resistance to ${level}...`);
+      const result = await this.sendResistanceCommand(level);
+      
+      if (result.success) {
+        console.log('✅ Complete resistance control sequence successful');
+        console.log(`🏁 Resistance level ${level} has been set`);
+        // 手動設定の追跡
+        this.lastSetResistance = level;
+        this.resistanceOverrideTime = Date.now();
+        // メトリクスの抵抗値を更新
+        this.currentMetrics.resistance = level;
+      } else {
+        console.log(`❌ Step 3 failed: ${result.error}`);
+      }
+      
+      return result;
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -534,14 +558,14 @@ export class AerobikeController {
     }
   }
 
-  private async requestControl(): Promise<void> {
+  private async requestControl(): Promise<OperationResult> {
     if (!this.controlPointCharacteristic) {
-      return;
+      return { success: false, error: 'Control Point not available' };
     }
 
     try {
       const requestControlCommand = Buffer.from([0x00]); // OpCode 0x00: Request Control
-      console.log('🎛️ Requesting control of fitness machine...');
+      console.log('🎛️ Step 1: Requesting control of fitness machine...');
       
       await new Promise<void>((resolve, reject) => {
         this.controlPointCharacteristic.write(requestControlCommand, true, (error: any) => {
@@ -550,12 +574,173 @@ export class AerobikeController {
         });
       });
       
-      // Wait for response
-      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('✅ Control request sent successfully');
+      return { success: true };
       
     } catch (error) {
       console.log('⚠️ Request control failed:', error);
-      // Don't throw - resistance command might still work
+      return { success: false, error: 'Request control failed' };
+    }
+  }
+
+  private async startResume(): Promise<OperationResult> {
+    if (!this.controlPointCharacteristic) {
+      return { success: false, error: 'Control Point not available' };
+    }
+
+    try {
+      const startResumeCommand = Buffer.from([0x07]); // OpCode 0x07: Start or Resume
+      console.log('▶️ Step 2: Starting/resuming fitness machine...');
+      
+      await new Promise<void>((resolve, reject) => {
+        this.controlPointCharacteristic.write(startResumeCommand, true, (error: any) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+      
+      console.log('✅ Start/Resume command sent successfully');
+      return { success: true };
+      
+    } catch (error) {
+      console.log('⚠️ Start/Resume failed:', error);
+      return { success: false, error: 'Start/Resume failed' };
+    }
+  }
+
+  private async sendResistanceCommand(level: number): Promise<OperationResult> {
+    if (!this.controlPointCharacteristic) {
+      console.log('❌ Control Point characteristic not available for resistance command');
+      return { success: false, error: 'Control Point not available' };
+    }
+
+    console.log(`🎯 Step 3: Setting resistance level to ${level}...`);
+    
+    // Method 1: Set Target Resistance Level (OpCode 0x04)
+    const success1 = await this.sendResistanceMethod1(level);
+    if (success1.success) {
+      return success1;
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Method 2: Set Target Power (OpCode 0x05) - as alternative
+    const powerTarget = level * 15; // Convert resistance to power estimate
+    const success2 = await this.sendPowerCommand(powerTarget);
+    if (success2.success) {
+      return success2;
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Method 3: Indoor Bike Simulation (OpCode 0x11) - using grade
+    const grade = (level - 1) * 0.5; // Convert to grade percentage
+    const success3 = await this.sendSimulationCommand(grade);
+    
+    return success3.success ? success3 : { success: false, error: 'All resistance control methods failed' };
+  }
+
+  private async sendResistanceMethod1(level: number): Promise<OperationResult> {
+    try {
+      // OpCode 0x04: Set Target Resistance Level
+      const command = Buffer.from([
+        0x04,                    // OpCode
+        level & 0xFF,           // Low byte
+        (level >> 8) & 0xFF     // High byte
+      ]);
+
+      console.log(`📡 Method 1 - Resistance command: ${command.toString('hex')} (OpCode: 0x04, Level: ${level})`);
+
+      await new Promise<void>((resolve, reject) => {
+        this.controlPointCharacteristic.write(command, true, (error: any) => {
+          if (error) {
+            console.log(`⚠️ Method 1 failed: ${error.message}`);
+            reject(error);
+          } else {
+            console.log('✅ Method 1 (Resistance Level) succeeded');
+            resolve();
+          }
+        });
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return { success: true };
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.log(`❌ Method 1 (Resistance Level) failed: ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  private async sendPowerCommand(watts: number): Promise<OperationResult> {
+    try {
+      // OpCode 0x05: Set Target Power
+      const command = Buffer.from([
+        0x05,                    // OpCode
+        watts & 0xFF,           // Low byte
+        (watts >> 8) & 0xFF     // High byte
+      ]);
+
+      console.log(`📡 Method 2 - Power command: ${command.toString('hex')} (OpCode: 0x05, Power: ${watts}W)`);
+
+      await new Promise<void>((resolve, reject) => {
+        this.controlPointCharacteristic.write(command, true, (error: any) => {
+          if (error) {
+            console.log(`⚠️ Method 2 failed: ${error.message}`);
+            reject(error);
+          } else {
+            console.log('✅ Method 2 (Target Power) succeeded');
+            resolve();
+          }
+        });
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return { success: true };
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.log(`❌ Method 2 (Target Power) failed: ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  private async sendSimulationCommand(gradePercent: number): Promise<OperationResult> {
+    try {
+      // OpCode 0x11: Set Indoor Bike Simulation Parameters
+      // Wind speed (0), Grade (0.01% units), Rolling resistance (0), Wind resistance (0)
+      const gradeInt = Math.round(gradePercent * 100); // Convert to 0.01% units
+      const command = Buffer.from([
+        0x11,                           // OpCode
+        0x00, 0x00,                    // Wind speed (2 bytes, little endian)
+        gradeInt & 0xFF,               // Grade low byte
+        (gradeInt >> 8) & 0xFF,        // Grade high byte
+        0x00, 0x00,                    // Rolling resistance (2 bytes)
+        0x00, 0x00                     // Wind resistance (2 bytes)
+      ]);
+
+      console.log(`📡 Method 3 - Simulation command: ${command.toString('hex')} (OpCode: 0x11, Grade: ${gradePercent.toFixed(1)}%)`);
+
+      await new Promise<void>((resolve, reject) => {
+        this.controlPointCharacteristic.write(command, true, (error: any) => {
+          if (error) {
+            console.log(`⚠️ Method 3 failed: ${error.message}`);
+            reject(error);
+          } else {
+            console.log('✅ Method 3 (Indoor Bike Simulation) succeeded');
+            resolve();
+          }
+        });
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return { success: true };
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.log(`❌ Method 3 (Indoor Bike Simulation) failed: ${errorMessage}`);
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -580,5 +765,17 @@ export class AerobikeController {
     }
     this.isConnected = false;
     this.isMonitoring = false;
+    
+    // 距離計算をリセット
+    this.calculatedDistance = 0;
+    this.lastDistanceUpdateTime = null;
+    this.speedHistory = [];
+    this.cadenceHistory = [];
+    
+    // 負荷制御状態をリセット
+    this.lastSetResistance = null;
+    this.resistanceOverrideTime = null;
+    
+    console.log('🔄 Distance calculation, history, and resistance control reset');
   }
 }
