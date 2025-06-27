@@ -79,17 +79,17 @@ const AerobikeTUI: React.FC<TUIProps> = ({ debug = false }) => {
     const originalConsoleWarn = console.warn;
 
     console.log = (...args) => {
-      addLog('info', args.join(' '));
-      originalConsoleLog(...args);
+      if (debug) addLog('info', args.join(' '));
+      // デバッグモード時は元のconsole.logを無効化してTUI上部への出力を抑制
     };
 
     console.error = (...args) => {
-      addLog('error', args.join(' '));
+      if (debug) addLog('error', args.join(' '));
       originalConsoleError(...args);
     };
 
     console.warn = (...args) => {
-      addLog('warn', args.join(' '));
+      if (debug) addLog('warn', args.join(' '));
       originalConsoleWarn(...args);
     };
 
@@ -176,32 +176,34 @@ const AerobikeTUI: React.FC<TUIProps> = ({ debug = false }) => {
     
     // J/Kキーで負荷調整
     if (input === 'j' || input === 'J') {
-      const newResistance = Math.max(1, metrics.resistance - 5);
-      if (debug) addLog('info', `Decreasing resistance to level ${newResistance}...`);
+      const currentResistance = metrics.resistance || 20; // デフォルト値を20に
+      const newResistance = Math.max(1, currentResistance - 5);
+      if (debug) addLog('info', `Decreasing resistance from ${currentResistance} to ${newResistance}...`);
       controller.setResistanceLevel(newResistance).then(result => {
         if (result.success) {
           setMetrics(prev => ({ ...prev, resistance: newResistance }));
-          if (debug) addLog('info', `Resistance decreased to level ${newResistance}`);
+          if (debug) addLog('info', `✅ Resistance decreased to level ${newResistance}`);
         } else {
-          if (debug) addLog('error', `Failed to set resistance: ${result.error}`);
+          if (debug) addLog('error', `❌ Failed to set resistance: ${result.error}`);
         }
       }).catch(err => {
-        if (debug) addLog('error', `Resistance error: ${err.message}`);
+        if (debug) addLog('error', `❌ Resistance error: ${err.message}`);
       });
     }
     
     if (input === 'k' || input === 'K') {
-      const newResistance = Math.min(80, metrics.resistance + 5);
-      if (debug) addLog('info', `Increasing resistance to level ${newResistance}...`);
+      const currentResistance = metrics.resistance || 20; // デフォルト値を20に
+      const newResistance = Math.min(80, currentResistance + 5);
+      if (debug) addLog('info', `Increasing resistance from ${currentResistance} to ${newResistance}...`);
       controller.setResistanceLevel(newResistance).then(result => {
         if (result.success) {
           setMetrics(prev => ({ ...prev, resistance: newResistance }));
-          if (debug) addLog('info', `Resistance increased to level ${newResistance}`);
+          if (debug) addLog('info', `✅ Resistance increased to level ${newResistance}`);
         } else {
-          if (debug) addLog('error', `Failed to set resistance: ${result.error}`);
+          if (debug) addLog('error', `❌ Failed to set resistance: ${result.error}`);
         }
       }).catch(err => {
-        if (debug) addLog('error', `Resistance error: ${err.message}`);
+        if (debug) addLog('error', `❌ Resistance error: ${err.message}`);
       });
     }
     
@@ -212,12 +214,12 @@ const AerobikeTUI: React.FC<TUIProps> = ({ debug = false }) => {
       controller.setResistanceLevel(resistanceLevel).then(result => {
         if (result.success) {
           setMetrics(prev => ({ ...prev, resistance: resistanceLevel }));
-          if (debug) addLog('info', `Resistance set to level ${resistanceLevel}`);
+          if (debug) addLog('info', `✅ Resistance set to level ${resistanceLevel}`);
         } else {
-          if (debug) addLog('error', `Failed to set resistance: ${result.error}`);
+          if (debug) addLog('error', `❌ Failed to set resistance: ${result.error}`);
         }
       }).catch(err => {
-        if (debug) addLog('error', `Resistance error: ${err.message}`);
+        if (debug) addLog('error', `❌ Resistance error: ${err.message}`);
       });
     }
   });
@@ -306,26 +308,6 @@ const AerobikeTUI: React.FC<TUIProps> = ({ debug = false }) => {
     }
   };
 
-  // パワーメーター表示コンポーネント
-  const PowerMeter: React.FC<{ power: number; max: number }> = ({ power, max }) => {
-    const width = 30;
-    const percentage = Math.min(power / max, 1);
-    const filled = Math.round(width * percentage);
-    const empty = width - filled;
-    
-    return (
-      <Box flexDirection="column">
-        <Box>
-          <Text color="red" bold>⚡ {power}W </Text>
-          <Text color="gray">({Math.round(percentage * 100)}%)</Text>
-        </Box>
-        <Box>
-          <Text color="red">{'█'.repeat(filled)}</Text>
-          <Text color="gray">{'░'.repeat(empty)}</Text>
-        </Box>
-      </Box>
-    );
-  };
 
   // レインボーバーコンポーネント
   const RainbowBar: React.FC<{ 
@@ -530,9 +512,9 @@ const AerobikeTUI: React.FC<TUIProps> = ({ debug = false }) => {
       </Box>
 
       {/* Main Content */}
-      <Box flexDirection={debug ? "row" : "column"}>
-        {/* Left Panel - Main UI */}
-        <Box flexDirection="column" width={debug ? "60%" : "100%"} marginRight={debug ? 2 : 0}>
+      <Box flexDirection="column">
+        {/* Main UI */}
+        <Box flexDirection="column">
           {/* Status */}
           <Box marginBottom={1}>
             <Text>Status: </Text>
@@ -542,6 +524,20 @@ const AerobikeTUI: React.FC<TUIProps> = ({ debug = false }) => {
             {lastUpdate && (
               <Text color="gray"> (Last update: {lastUpdate})</Text>
             )}
+          </Box>
+
+          {/* Control Panel */}
+          <Box flexDirection="column" borderStyle="round" padding={1} marginBottom={1}>
+            <Text bold color="yellow">🎛️ Controls</Text>
+            <Text>
+              <Text color="cyan">s</Text> - Start scan | 
+              <Text color="cyan"> c</Text> - Connect | 
+              <Text color="cyan"> j/k</Text> - Resistance ±5
+            </Text>
+            <Text>
+              <Text color="cyan">1-8</Text> - Set resistance (1=10, 2=20...8=80) | 
+              <Text color="cyan"> q</Text> - Quit
+            </Text>
           </Box>
 
           {/* Metrics Grid */}
@@ -595,12 +591,6 @@ const AerobikeTUI: React.FC<TUIProps> = ({ debug = false }) => {
             </Box>
           </Box>
 
-          {/* パワーメーター */}
-          <Box flexDirection="column" borderStyle="round" padding={1} marginBottom={1}>
-            <Text bold color="yellow">⚡ Power Meter</Text>
-            <PowerMeter power={metrics.power} max={maxPower} />
-          </Box>
-
           {/* レインボーバー */}
           <Box flexDirection="column" borderStyle="round" padding={1} marginBottom={1}>
             <Text bold color="yellow">🌈 Live Metrics Bars</Text>
@@ -646,20 +636,6 @@ const AerobikeTUI: React.FC<TUIProps> = ({ debug = false }) => {
             </Box>
           )}
 
-          {/* Control Panel */}
-          <Box flexDirection="column" borderStyle="round" padding={1} marginBottom={1}>
-            <Text bold color="yellow">🎛️ Controls</Text>
-            <Text>
-              <Text color="cyan">s</Text> - Start scan | 
-              <Text color="cyan"> c</Text> - Connect | 
-              <Text color="cyan"> j/k</Text> - Resistance ±5
-            </Text>
-            <Text>
-              <Text color="cyan">1-8</Text> - Set resistance (1=10, 2=20...8=80) | 
-              <Text color="cyan"> q</Text> - Quit
-            </Text>
-          </Box>
-
           {/* Footer */}
           <Box justifyContent="center">
             <Text color="gray">Press any key to interact • Current time: {formatTime(new Date())}</Text>
@@ -667,37 +643,34 @@ const AerobikeTUI: React.FC<TUIProps> = ({ debug = false }) => {
         </Box>
 
         {/* Graphs Panel */}
-        {!debug && (
-          <Box flexDirection="row" marginTop={1}>
+        <Box flexDirection="row" marginTop={1}>
+          <SimpleGraph 
+            data={graphData} 
+            type="speed-power" 
+            title="📈 Speed & Power"
+          />
+          <Box marginLeft={2}>
             <SimpleGraph 
               data={graphData} 
-              type="speed-power" 
-              title="📈 Speed & Power"
+              type="distance" 
+              title="📏 Distance"
             />
-            <Box marginLeft={2}>
-              <SimpleGraph 
-                data={graphData} 
-                type="distance" 
-                title="📏 Distance"
-              />
-            </Box>
           </Box>
-        )}
+          {debug && (
+            <Box marginLeft={2} flexDirection="column" borderStyle="round" padding={1} width={40}>
+              <Text bold color="magenta">🐛 Debug Logs</Text>
+              <Box flexDirection="column" height={20} overflow="hidden">
+                {logs.slice(-15).map((log, index) => (
+                  <Box key={index}>
+                    <Text color="gray">{log.timestamp} </Text>
+                    <Text color={getLogColor(log.level)} wrap="truncate">[{log.level.toUpperCase()}] {log.message}</Text>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
+        </Box>
 
-        {/* Right Panel - Debug Logs (only in debug mode) */}
-        {debug && (
-          <Box flexDirection="column" width="40%" borderStyle="round" padding={1}>
-            <Text bold color="magenta">🐛 Debug Logs</Text>
-            <Box flexDirection="column" height={20} overflow="hidden">
-              {logs.slice(-15).map((log, index) => (
-                <Box key={index}>
-                  <Text color="gray">{log.timestamp} </Text>
-                  <Text color={getLogColor(log.level)}>[{log.level.toUpperCase()}] {log.message}</Text>
-                </Box>
-              ))}
-            </Box>
-          </Box>
-        )}
       </Box>
     </Box>
   );
