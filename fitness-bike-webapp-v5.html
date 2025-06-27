@@ -83,8 +83,7 @@
         }
         
         .connection-control {
-            text-align: center;
-            margin: 20px 0;
+            display: none;
         }
         
         .toggle-btn {
@@ -199,14 +198,14 @@
         .resistance-panel {
             background: linear-gradient(135deg, #ff6b6b, #ee5a52);
             border-radius: 12px;
-            padding: 15px;
+            padding: 12px;
             color: white;
             margin: 20px 0;
         }
         
         .resistance-display {
             text-align: center;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
         
         .resistance-level {
@@ -215,41 +214,11 @@
             text-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
         
-        .slider-container {
-            margin: 15px 0;
-            position: relative;
-        }
-        
-        .slider {
-            width: 100%;
-            height: 10px;
-            border-radius: 5px;
-            background: rgba(255,255,255,0.3);
-            outline: none;
-            -webkit-appearance: none;
-            position: relative;
-        }
-        
-        .slider::-webkit-slider-thumb {
-            appearance: none;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: linear-gradient(45deg, #fff, #f0f0f0);
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            transition: all 0.2s ease;
-        }
-        
-        .slider::-webkit-slider-thumb:hover {
-            transform: scale(1.1);
-        }
-        
         .quick-controls {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(6, 1fr);
             gap: 8px;
-            margin-top: 15px;
+            margin-top: 10px;
         }
         
         .quick-btn {
@@ -267,6 +236,11 @@
         .quick-btn:hover {
             background: rgba(255,255,255,0.3);
             transform: translateY(-2px);
+        }
+        
+        .quick-btn:active {
+            background: rgba(255,255,255,0.4);
+            transform: translateY(0px);
         }
         
         .chart-container {
@@ -586,10 +560,7 @@
         
         <div id="status" class="status disconnected">
             未接続 - バイクの電源を入れて「接続」ボタンを押してください
-        </div>
-
-        <div class="connection-control">
-            <button id="connectionToggle" class="toggle-btn">🔗 接続</button>
+            <button id="connectionToggle" class="toggle-btn" style="margin-left: 15px;">🔗 接続</button>
         </div>
 
         <div class="main-dashboard">
@@ -597,15 +568,30 @@
             <div class="data-grid">
                 <div class="metric-card">
                     <div class="metric-label">速度</div>
-                    <div class="metric-value"><span id="speed">0</span><span class="metric-unit">km/h</span></div>
+                    <div class="metric-value">
+                        <span id="speed">0</span><span class="metric-unit">km/h</span>
+                        <div style="font-size: 0.7em; opacity: 0.8; margin-top: 2px;">
+                            MAX: <span id="maxSpeed">0</span>km/h
+                        </div>
+                    </div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">ケイデンス</div>
-                    <div class="metric-value"><span id="cadence">0</span><span class="metric-unit">rpm</span></div>
+                    <div class="metric-value">
+                        <span id="cadence">0</span><span class="metric-unit">rpm</span>
+                        <div style="font-size: 0.7em; opacity: 0.8; margin-top: 2px;">
+                            MAX: <span id="maxCadence">0</span>rpm
+                        </div>
+                    </div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">パワー</div>
-                    <div class="metric-value"><span id="powerValue">0</span><span class="metric-unit">W</span></div>
+                    <div class="metric-value">
+                        <span id="powerValue">0</span><span class="metric-unit">W</span>
+                        <div style="font-size: 0.7em; opacity: 0.8; margin-top: 2px;">
+                            MAX: <span id="maxPower">0</span>W
+                        </div>
+                    </div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">セッション距離</div>
@@ -634,24 +620,21 @@
         <div id="resistancePanel" class="resistance-panel">
             <h3>🔧 負荷調整 (Resistance Control)</h3>
             <div class="resistance-display">
-                <div class="resistance-level">レベル <span id="resistanceLevel">1</span></div>
-                <div style="opacity: 0.8; margin-top: 5px;">1 - 80</div>
-            </div>
-            <div class="slider-container">
-                <input type="range" min="1" max="80" value="1" class="slider" id="resistanceSlider">
+                <div class="resistance-level">レベル <span id="resistanceLevel">1</span> / 最大80</div>
             </div>
             <div class="quick-controls">
-                <button class="quick-btn" onclick="setResistance(1)">軽い<br>1</button>
+                <button class="quick-btn" onclick="setResistance(10)">軽い<br>10</button>
                 <button class="quick-btn" onclick="setResistance(20)">普通<br>20</button>
+                <button class="quick-btn" onclick="setResistance(30)">中<br>30</button>
                 <button class="quick-btn" onclick="setResistance(40)">重い<br>40</button>
-                <button class="quick-btn" onclick="setResistance(60)">最重<br>60</button>
+                <button class="quick-btn" onclick="setResistance(60)">きつい<br>60</button>
+                <button class="quick-btn" onclick="setResistance(80)">最高<br>80</button>
             </div>
         </div>
 
         <!-- グラフ表示パネル -->
         <div id="chartPanel" class="chart-container">
             <h3>📈 ワークアウトグラフ</h3>
-            <button id="toggleChartBtn" class="btn-small" style="float: right;">📈 グラフ非表示</button>
             <canvas id="workoutChart" class="chart-canvas"></canvas>
         </div>
 
@@ -768,6 +751,11 @@
                 this.lastDistanceUpdateTime = null;
                 this.lastTotalDistanceUpdate = 0;
                 this.currentResistance = 1;
+                
+                // セッション最大値記録
+                this.sessionMaxSpeed = 0;
+                this.sessionMaxCadence = 0;
+                this.sessionMaxPower = 0;
                 this.startTime = null;
                 this.lastResistanceCommand = 0;
                 this.resistanceThrottle = 2000;
@@ -824,7 +812,7 @@
             initializeEventListeners() {
                 document.getElementById('connectionToggle').addEventListener('click', () => this.toggleConnection());
                 document.getElementById('settingsBtn').addEventListener('click', () => this.toggleSettings());
-                document.getElementById('toggleChartBtn').addEventListener('click', () => this.toggleChart());
+                // グラフ非表示ボタンは削除済み
                 
                 // 設定パネルのイベント
                 document.getElementById('closeSettingsBtn').addEventListener('click', () => this.toggleSettings());
@@ -832,10 +820,7 @@
                 document.getElementById('cancelResetBtn').addEventListener('click', () => this.hideResetModal());
                 document.getElementById('confirmResetBtn').addEventListener('click', () => this.confirmResetData());
                 
-                // スロットル付きの負荷調整
-                document.getElementById('resistanceSlider').addEventListener('input', (e) => {
-                    this.throttledResistanceChange(parseInt(e.target.value));
-                });
+                // resistanceSlider は削除済みのため、イベントリスナーも削除
             }
             
             loadStoredData() {
@@ -893,6 +878,41 @@
                     this.addDistanceToTotal(increment);
                     this.lastTotalDistanceUpdate = this.sessionDistance;
                     this.log(`📊 リアルタイム総距離更新: +${increment.toFixed(0)}m`);
+                }
+            }
+            
+            updateSessionMax(type, value) {
+                let updated = false;
+                
+                switch(type) {
+                    case 'speed':
+                        if (value > this.sessionMaxSpeed) {
+                            this.sessionMaxSpeed = value;
+                            const elem = document.getElementById('maxSpeed');
+                            if (elem) elem.textContent = value.toFixed(1);
+                            updated = true;
+                        }
+                        break;
+                    case 'cadence':
+                        if (value > this.sessionMaxCadence) {
+                            this.sessionMaxCadence = value;
+                            const elem = document.getElementById('maxCadence');
+                            if (elem) elem.textContent = value.toFixed(0);
+                            updated = true;
+                        }
+                        break;
+                    case 'power':
+                        if (value > this.sessionMaxPower) {
+                            this.sessionMaxPower = value;
+                            const elem = document.getElementById('maxPower');
+                            if (elem) elem.textContent = value.toFixed(0);
+                            updated = true;
+                        }
+                        break;
+                }
+                
+                if (updated) {
+                    this.log(`🏆 新記録更新: ${type} = ${value.toFixed(type === 'speed' ? 1 : 0)}`);
                 }
             }
             
@@ -1057,7 +1077,6 @@
                 } else {
                     // UI だけ更新
                     document.getElementById('resistanceLevel').textContent = level;
-                    document.getElementById('resistanceSlider').value = level;
                     this.log(`⏳ 負荷調整はスロットル中 (${this.resistanceThrottle/1000}秒間隔)`);
                 }
             }
@@ -1083,8 +1102,13 @@
 
             updateStatus(message, isConnected = false) {
                 const statusElement = document.getElementById('status');
-                statusElement.textContent = message;
-                statusElement.className = `status ${isConnected ? 'connected' : 'disconnected'}`;
+                if (statusElement) {
+                    // ステータステキストを更新する時はボタンを保持
+                    const button = statusElement.querySelector('#connectionToggle');
+                    const buttonHTML = button ? button.outerHTML : '';
+                    statusElement.innerHTML = message + (buttonHTML ? ' ' + buttonHTML : '');
+                    statusElement.className = `status ${isConnected ? 'connected' : 'disconnected'}`;
+                }
             }
 
             updatePowerDisplay(power) {
@@ -1092,11 +1116,15 @@
                 const percentage = Math.min(power / maxPower, 1);
                 
                 // カード表示更新
-                document.getElementById('powerValue').textContent = power;
+                const powerValueElem = document.getElementById('powerValue');
+                if (powerValueElem) powerValueElem.textContent = power;
                 
                 // バー表示更新
-                document.getElementById('powerBarFill').style.width = `${percentage * 100}%`;
-                document.getElementById('powerBarFill').textContent = `${power}W`;
+                const powerBarFillElem = document.getElementById('powerBarFill');
+                if (powerBarFillElem) {
+                    powerBarFillElem.style.width = `${percentage * 100}%`;
+                    powerBarFillElem.textContent = `${power}W`;
+                }
             }
 
             updateDuration() {
@@ -1127,26 +1155,10 @@
                 }
             }
             
-            toggleChart() {
-                this.chartVisible = !this.chartVisible;
-                
-                const chartPanel = document.getElementById('chartPanel');
-                const toggleBtn = document.getElementById('toggleChartBtn');
-                
-                if (this.chartVisible) {
-                    chartPanel.style.display = 'block';
-                    toggleBtn.textContent = '📈 グラフ非表示';
-                    this.initChart();
-                    this.log('📈 グラフパネルを表示');
-                } else {
-                    chartPanel.style.display = 'none';
-                    toggleBtn.textContent = '📈 グラフ表示';
-                    this.log('📈 グラフパネルを非表示');
-                }
-            }
+            // toggleChart function removed - グラフは常に表示
             
             initChart() {
-                if (!this.chartVisible) return;
+                // チャートは常に表示
                 
                 const canvas = document.getElementById('workoutChart');
                 const ctx = canvas.getContext('2d');
@@ -1423,12 +1435,14 @@
 
             updateConnectionButton() {
                 const btn = document.getElementById('connectionToggle');
-                if (this.isConnected) {
-                    btn.textContent = '❌ 切断';
-                    btn.classList.add('connected');
-                } else {
-                    btn.textContent = '🔗 接続';
-                    btn.classList.remove('connected');
+                if (btn) {
+                    if (this.isConnected) {
+                        btn.textContent = '❌ 切断';
+                        btn.classList.add('connected');
+                    } else {
+                        btn.textContent = '🔗 接続';
+                        btn.classList.remove('connected');
+                    }
                 }
             }
 
@@ -1612,6 +1626,18 @@
                 this.startTime = Date.now();
                 this.sessionDistance = 0; // セッション距離をリセット
                 this.lastTotalDistanceUpdate = 0; // 総距離更新のベースリセット
+                
+                // セッション最大値をリセット
+                this.sessionMaxSpeed = 0;
+                this.sessionMaxCadence = 0;
+                this.sessionMaxPower = 0;
+                const maxSpeedElem = document.getElementById('maxSpeed');
+                const maxCadenceElem = document.getElementById('maxCadence');
+                const maxPowerElem = document.getElementById('maxPower');
+                if (maxSpeedElem) maxSpeedElem.textContent = '0';
+                if (maxCadenceElem) maxCadenceElem.textContent = '0';
+                if (maxPowerElem) maxPowerElem.textContent = '0';
+                
                 this.log('▶️ データ監視を開始します...');
 
                 // 制御権要求とセットアップを追加
@@ -1730,6 +1756,9 @@
                         document.getElementById('speed').textContent = avgSpeed.toFixed(1);
                         debugInfo += `Speed: ${avgSpeed.toFixed(1)} km/h (raw: ${rawSpeed.toFixed(1)}, avg of ${this.speedHistory.length} points)\n`;
                         
+                        // セッション最大速度を更新
+                        this.updateSessionMax('speed', avgSpeed);
+                        
                         // 速度から距離を計算（ハードウェア距離が無効な場合）
                         if (this.distanceCalculationEnabled) {
                             this.calculateDistanceFromSpeed(avgSpeed);
@@ -1755,6 +1784,9 @@
                         const cadence = dataView.getUint16(offset, true) * 0.5; // 0.5 rpm resolution
                         document.getElementById('cadence').textContent = cadence.toFixed(0);
                         debugInfo += `Cadence: ${cadence.toFixed(0)} rpm (raw: ${dataView.getUint16(offset, true)})\n`;
+                        
+                        // セッション最大ケイデンスを更新
+                        this.updateSessionMax('cadence', cadence);
                         
                         // ワークアウトデータに追加
                         this.addWorkoutData('cadence', cadence);
@@ -1821,6 +1853,9 @@
                         if (power >= 0 && power <= 2000) { // 妥当な範囲のパワー値のみ表示
                             this.updatePowerDisplay(power);
                             debugInfo += `Power: ${power} W (raw: ${dataView.getInt16(offset, true)})\n`;
+                            
+                            // セッション最大パワーを更新
+                            this.updateSessionMax('power', power);
                             
                             // ワークアウトデータに追加
                             this.addWorkoutData('power', power);
@@ -1914,7 +1949,6 @@
             async setResistanceLevel(level) {
                 this.currentResistance = level;
                 document.getElementById('resistanceLevel').textContent = level;
-                document.getElementById('resistanceSlider').value = level;
                 
                 if (this.controlPoint) {
                     await this.sendResistanceCommand(level);
@@ -1968,7 +2002,7 @@
                 
                 // グラフ更新（1秒ごと）
                 this.dataPoints++;
-                if (this.dataPoints % 10 === 0 && this.chartVisible) {
+                if (this.dataPoints % 10 === 0) {
                     this.initChart();
                 }
             }
@@ -2057,6 +2091,7 @@
             
             // グローバル関数
             window.setResistance = function(level) {
+                console.log('setResistance called with level:', level);
                 bikeController.setResistanceLevel(level);
             };
         }
