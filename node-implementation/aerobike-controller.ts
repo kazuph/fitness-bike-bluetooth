@@ -37,6 +37,16 @@ export class AerobikeController {
   private discoveredDevices: Map<string, any> = new Map();
   private currentScanResolver: ((value: OperationResult) => void) | null = null;
   private scanTimeout: NodeJS.Timeout | null = null;
+  
+  // 距離計算用
+  private lastDistanceUpdateTime: number | null = null;
+  private calculatedDistance: number = 0;
+  private distanceCalculationEnabled: boolean = false;
+  
+  // 平均値計算用
+  private speedHistory: number[] = [];
+  private cadenceHistory: number[] = [];
+  private maxHistoryLength: number = 10;
 
   // Bluetooth UUIDs
   private readonly FITNESS_MACHINE_SERVICE = '1826';
@@ -55,6 +65,11 @@ export class AerobikeController {
       resistance: 0,
       timestamp: new Date()
     };
+
+    // 距離計算の初期化
+    this.lastDistanceUpdateTime = null;
+    this.calculatedDistance = 0;
+    this.distanceCalculationEnabled = true; // デフォルトで速度積分を有効
 
     this.setupNoble();
   }
@@ -311,7 +326,17 @@ export class AerobikeController {
 
       // Instantaneous Speed (always present)
       if (offset + 2 <= data.length) {
-        this.currentMetrics.speed = data.readUInt16LE(offset) * 0.01;
+        const speed = data.readUInt16LE(offset) * 0.01;
+        this.currentMetrics.speed = speed;
+        
+        // 速度履歴を更新して平均値を計算
+        this.updateSpeedHistory(speed);
+        
+        // 距離を積分計算で更新
+        if (this.distanceCalculationEnabled) {
+          this.updateCalculatedDistance(speed);
+        }
+        
         offset += 2;
       }
 
@@ -319,11 +344,19 @@ export class AerobikeController {
       if ((flags & 0x02) && offset + 2 <= data.length) {
         this.currentMetrics.averageSpeed = data.readUInt16LE(offset) * 0.01;
         offset += 2;
+      } else {
+        // ハードウェア平均値がない場合は計算値を使用
+        this.currentMetrics.averageSpeed = this.calculateAverageSpeed();
       }
 
       // Instantaneous Cadence (bit 2)
       if ((flags & 0x04) && offset + 2 <= data.length) {
-        this.currentMetrics.cadence = data.readUInt16LE(offset) * 0.5;
+        const cadence = data.readUInt16LE(offset) * 0.5;
+        this.currentMetrics.cadence = cadence;
+        
+        // ケイデンス履歴を更新
+        this.updateCadenceHistory(cadence);
+        
         offset += 2;
       }
 
@@ -331,12 +364,29 @@ export class AerobikeController {
       if ((flags & 0x08) && offset + 2 <= data.length) {
         this.currentMetrics.averageCadence = data.readUInt16LE(offset) * 0.5;
         offset += 2;
+      } else {
+        // ハードウェア平均値がない場合は計算値を使用
+        this.currentMetrics.averageCadence = this.calculateAverageCadence();
       }
 
       // Total Distance (bit 4)
       if ((flags & 0x10) && offset + 3 <= data.length) {
-        this.currentMetrics.distance = (data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16));
+        const hardwareDistance = (data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16));
+        
+        // ハードウェア距離が有効な場合のみ使用
+        if (hardwareDistance > 0 && hardwareDistance < 999999) {
+          this.currentMetrics.distance = hardwareDistance;
+          this.distanceCalculationEnabled = false;
+          console.log(`📏 Using hardware distance: ${hardwareDistance}m`);
+        } else {
+          // 無効な場合は計算距離を使用
+          this.currentMetrics.distance = Math.round(this.calculatedDistance);
+          console.log(`📏 Using calculated distance: ${Math.round(this.calculatedDistance)}m`);
+        }
         offset += 3;
+      } else {
+        // 距離データがない場合は計算距離を使用
+        this.currentMetrics.distance = Math.round(this.calculatedDistance);
       }
 
       // Resistance Level (bit 5)
@@ -360,6 +410,50 @@ export class AerobikeController {
     } catch (error) {
       console.error('❌ Data parsing error:', error);
     }
+  }
+
+  private updateSpeedHistory(speed: number): void {
+    this.speedHistory.push(speed);
+    if (this.speedHistory.length > this.maxHistoryLength) {
+      this.speedHistory.shift();
+    }
+  }
+
+  private updateCadenceHistory(cadence: number): void {
+    this.cadenceHistory.push(cadence);
+    if (this.cadenceHistory.length > this.maxHistoryLength) {
+      this.cadenceHistory.shift();
+    }
+  }
+
+  private calculateAverageSpeed(): number {
+    if (this.speedHistory.length === 0) return 0;
+    const sum = this.speedHistory.reduce((acc, speed) => acc + speed, 0);
+    return sum / this.speedHistory.length;
+  }
+
+  private calculateAverageCadence(): number {
+    if (this.cadenceHistory.length === 0) return 0;
+    const sum = this.cadenceHistory.reduce((acc, cadence) => acc + cadence, 0);
+    return sum / this.cadenceHistory.length;
+  }
+
+  private updateCalculatedDistance(speed: number): void {
+    const now = Date.now();
+    
+    if (this.lastDistanceUpdateTime && speed > 0) {
+      const timeElapsedSeconds = (now - this.lastDistanceUpdateTime) / 1000;
+      const speedMs = speed / 3.6; // km/h to m/s
+      const distanceIncrement = speedMs * timeElapsedSeconds;
+      
+      // 妥当な範囲の増分のみ追加（0.1m～100m）
+      if (distanceIncrement > 0.1 && distanceIncrement < 100) {
+        this.calculatedDistance += distanceIncrement;
+        console.log(`🧮 Distance increment: +${distanceIncrement.toFixed(2)}m (total: ${this.calculatedDistance.toFixed(1)}m)`);
+      }
+    }
+    
+    this.lastDistanceUpdateTime = now;
   }
 
   private handleControlPointResponse(data: Buffer): void {
