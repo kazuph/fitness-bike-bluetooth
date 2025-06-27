@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚴‍♂️ Fitness Bike Controller</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        
+        .settings-btn {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .settings-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 12px;
+            margin: 20px 0;
+            text-align: center;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .status.connected {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .status.disconnected {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            color: white;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+        }
+        
+        .connection-control {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .toggle-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .toggle-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .toggle-btn.connected {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+        }
+        
+        .main-dashboard {
+            display: block;
+            margin: 20px 0;
+        }
+        
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .data-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 12px;
+            padding: 15px;
+            color: white;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .metric-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+        
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .metric-unit {
+            font-size: 0.8em;
+            opacity: 0.9;
+        }
+        
+        /* パワーバー */
+        .power-bar-section {
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            border-radius: 12px;
+            padding: 15px;
+            color: white;
+            margin: 20px 0;
+        }
+        
+        .power-bar-label {
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .power-bar {
+            width: 100%;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .power-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4CAF50, #FFC107, #f44336);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        /* 負荷調整 */
+        .resistance-panel {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            border-radius: 12px;
+            padding: 15px;
+            color: white;
+            margin: 20px 0;
+        }
+        
+        .resistance-display {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .resistance-level {
+            font-size: 1.5em;
+            font-weight: bold;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .slider-container {
+            margin: 15px 0;
+            position: relative;
+        }
+        
+        .slider {
+            width: 100%;
+            height: 10px;
+            border-radius: 5px;
+            background: rgba(255,255,255,0.3);
+            outline: none;
+            -webkit-appearance: none;
+            position: relative;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #fff, #f0f0f0);
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+        }
+        
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+        
+        .quick-controls {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+        }
+        
+        .quick-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .quick-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            display: block;
+        }
+        
+        .chart-canvas {
+            width: 100%;
+            height: 300px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        
+        .btn-small {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-small:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        /* デバッグパネル */
+        .debug-panel {
+            background: #2a2a2a;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 30px 0;
+            color: white;
+            display: none;
+        }
+        
+        .debug-panel.show {
+            display: block;
+            animation: slideIn 0.5s ease;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .debug-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #3a3a3a;
+            border-radius: 10px;
+        }
+        
+        .debug-title {
+            color: #00ffff;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .debug-data {
+            font-family: 'Monaco', monospace;
+            font-size: 12px;
+            color: #00ff00;
+            white-space: pre-wrap;
+        }
+        
+        /* ログ */
+        .log-panel {
+            background: #1a1a1a;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 30px 0;
+            display: none;
+        }
+        
+        .log-panel.show {
+            display: block;
+            animation: slideIn 0.5s ease;
+        }
+        
+        .log-content {
+            height: 300px;
+            overflow-y: auto;
+            background: #000;
+            border-radius: 10px;
+            padding: 15px;
+            font-family: 'Monaco', monospace;
+            font-size: 12px;
+            color: #00ff00;
+            line-height: 1.5;
+        }
+        
+        .log-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .log-content::-webkit-scrollbar-track {
+            background: #2a2a2a;
+            border-radius: 4px;
+        }
+        
+        .log-content::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚴‍♂️ Fitness Bike Controller</h1>
+            <button id="settingsBtn" class="settings-btn">⚙️</button>
+        </div>
+        
+        <div id="status" class="status disconnected">
+            未接続 - バイクの電源を入れて「接続」ボタンを押してください
+        </div>
+
+        <div class="connection-control">
+            <button id="connectionToggle" class="toggle-btn">🔗 接続</button>
+        </div>
+
+        <div class="main-dashboard">
+            <!-- データグリッド -->
+            <div class="data-grid">
+                <div class="metric-card">
+                    <div class="metric-label">速度</div>
+                    <div class="metric-value"><span id="speed">0</span><span class="metric-unit">km/h</span></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">ケイデンス</div>
+                    <div class="metric-value"><span id="cadence">0</span><span class="metric-unit">rpm</span></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">パワー</div>
+                    <div class="metric-value"><span id="powerValue">0</span><span class="metric-unit">W</span></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">距離</div>
+                    <div class="metric-value"><span id="distance">0</span><span class="metric-unit" id="distanceUnit">m</span></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">時間</div>
+                    <div class="metric-value"><span id="duration">00:00</span><span class="metric-unit"></span></div>
+                </div>
+            </div>
+            
+            <!-- パワーバー表示 -->
+            <div class="power-bar-section">
+                <div class="power-bar-label">💪 Power Output</div>
+                <div class="power-bar">
+                    <div class="power-bar-fill" id="powerBarFill">0W</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 負荷調整パネル -->
+        <div id="resistancePanel" class="resistance-panel">
+            <h3>🔧 負荷調整 (Resistance Control)</h3>
+            <div class="resistance-display">
+                <div class="resistance-level">レベル <span id="resistanceLevel">1</span></div>
+                <div style="opacity: 0.8; margin-top: 5px;">1 - 80</div>
+            </div>
+            <div class="slider-container">
+                <input type="range" min="1" max="80" value="1" class="slider" id="resistanceSlider">
+            </div>
+            <div class="quick-controls">
+                <button class="quick-btn" onclick="setResistance(1)">軽い<br>1</button>
+                <button class="quick-btn" onclick="setResistance(20)">普通<br>20</button>
+                <button class="quick-btn" onclick="setResistance(40)">重い<br>40</button>
+                <button class="quick-btn" onclick="setResistance(60)">最重<br>60</button>
+            </div>
+        </div>
+
+        <!-- グラフ表示パネル -->
+        <div id="chartPanel" class="chart-container">
+            <h3>📈 ワークアウトグラフ</h3>
+            <button id="toggleChartBtn" class="btn-small" style="float: right;">📈 グラフ非表示</button>
+            <canvas id="workoutChart" class="chart-canvas"></canvas>
+        </div>
+
+        <!-- デバッグパネル -->
+        <div class="debug-panel" id="debugPanel">
+            <h3 style="color: #ffff00; margin-bottom: 15px;">🔍 デバッグ情報</h3>
+            
+            <div class="debug-section">
+                <div class="debug-title">📊 最新のIndoor Bike Data</div>
+                <div id="debugIndoorBike" class="debug-data">データなし</div>
+            </div>
+            
+            <div class="debug-section">
+                <div class="debug-title">⚡ 最新のCycling Power Data</div>
+                <div id="debugCyclingPower" class="debug-data">データなし</div>
+            </div>
+            
+            <div class="debug-section">
+                <div class="debug-title">🚀 最新のSpeed & Cadence Data</div>
+                <div id="debugCSC" class="debug-data">データなし</div>
+            </div>
+            
+            <div class="debug-section">
+                <div class="debug-title">🔧 制御コマンド送信状況</div>
+                <div id="debugControl" class="debug-data">コマンドなし</div>
+            </div>
+        </div>
+
+        <!-- ログパネル -->
+        <div class="log-panel" id="logPanel">
+            <h3 style="color: white; margin-bottom: 15px;">📊 システムログ</h3>
+            <div id="log" class="log-content"></div>
+        </div>
+    </div>
+
+    <script>
+        class FitnessBikeController {
+            constructor() {
+                this.device = null;
+                this.server = null;
+                this.isMonitoring = false;
+                this.totalDistance = 0;
+                this.currentResistance = 1;
+                this.startTime = null;
+                this.lastResistanceCommand = 0;
+                this.resistanceThrottle = 2000;
+                this.controlPoint = null;
+                this.debugVisible = false;
+                this.chartVisible = true;
+                this.isConnected = false;
+                
+                // 速度の時間平均用
+                this.speedHistory = [];
+                this.speedHistoryMaxLength = 3;
+                
+                this.workoutData = {
+                    time: [],
+                    speed: [],
+                    power: [],
+                    cadence: []
+                };
+                this.dataPoints = 0;
+                this.maxDataPoints = 300;
+                
+                // Bluetooth Services
+                this.services = {
+                    FITNESS_MACHINE: '00001826-0000-1000-8000-00805f9b34fb',
+                    CYCLING_POWER: '00001818-0000-1000-8000-00805f9b34fb',
+                    CYCLING_SPEED_CADENCE: '00001816-0000-1000-8000-00805f9b34fb'
+                };
+                
+                // Characteristics
+                this.characteristics = {
+                    FITNESS_MACHINE_FEATURE: '00002acc-0000-1000-8000-00805f9b34fb',
+                    INDOOR_BIKE_DATA: '00002ad2-0000-1000-8000-00805f9b34fb',
+                    FITNESS_MACHINE_CONTROL_POINT: '00002ad9-0000-1000-8000-00805f9b34fb',
+                    CYCLING_POWER_MEASUREMENT: '00002a63-0000-1000-8000-00805f9b34fb',
+                    CSC_MEASUREMENT: '00002a5b-0000-1000-8000-00805f9b34fb'
+                };
+                
+                this.initializeEventListeners();
+                this.updateDuration();
+            }
+
+            initializeEventListeners() {
+                document.getElementById('connectionToggle').addEventListener('click', () => this.toggleConnection());
+                document.getElementById('settingsBtn').addEventListener('click', () => this.toggleDebug());
+                document.getElementById('toggleChartBtn').addEventListener('click', () => this.toggleChart());
+                
+                // スロットル付きの負荷調整
+                document.getElementById('resistanceSlider').addEventListener('input', (e) => {
+                    this.throttledResistanceChange(parseInt(e.target.value));
+                });
+            }
+
+            throttledResistanceChange(level) {
+                const now = Date.now();
+                if (now - this.lastResistanceCommand > this.resistanceThrottle) {
+                    this.setResistanceLevel(level);
+                    this.lastResistanceCommand = now;
+                } else {
+                    // UI だけ更新
+                    document.getElementById('resistanceLevel').textContent = level;
+                    document.getElementById('resistanceSlider').value = level;
+                    this.log(`⏳ 負荷調整はスロットル中 (${this.resistanceThrottle/1000}秒間隔)`);
+                }
+            }
+
+            log(message) {
+                const logElement = document.getElementById('log');
+                const timestamp = new Date().toLocaleTimeString();
+                logElement.innerHTML += `<span style="color: #00ffff;">[${timestamp}]</span> <span style="color: #00ff00;">${message}</span>\n`;
+                logElement.scrollTop = logElement.scrollHeight;
+                console.log(message);
+            }
+
+            debugLog(section, data) {
+                const element = document.getElementById(section);
+                if (element) {
+                    element.textContent = data;
+                }
+            }
+
+            bytesToHex(bytes) {
+                return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+            }
+
+            updateStatus(message, isConnected = false) {
+                const statusElement = document.getElementById('status');
+                statusElement.textContent = message;
+                statusElement.className = `status ${isConnected ? 'connected' : 'disconnected'}`;
+            }
+
+            updatePowerDisplay(power) {
+                const maxPower = 500;
+                const percentage = Math.min(power / maxPower, 1);
+                
+                // カード表示更新
+                document.getElementById('powerValue').textContent = power;
+                
+                // バー表示更新
+                document.getElementById('powerBarFill').style.width = `${percentage * 100}%`;
+                document.getElementById('powerBarFill').textContent = `${power}W`;
+            }
+
+            updateDuration() {
+                if (this.startTime && this.isMonitoring) {
+                    const elapsed = Date.now() - this.startTime;
+                    const minutes = Math.floor(elapsed / 60000);
+                    const seconds = Math.floor((elapsed % 60000) / 1000);
+                    document.getElementById('duration').textContent = 
+                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+                setTimeout(() => this.updateDuration(), 1000);
+            }
+
+            toggleDebug() {
+                this.debugVisible = !this.debugVisible;
+                
+                const debugPanel = document.getElementById('debugPanel');
+                const logPanel = document.getElementById('logPanel');
+                
+                if (this.debugVisible) {
+                    debugPanel.classList.add('show');
+                    logPanel.classList.add('show');
+                    this.log('🔍 デバッグ情報を表示');
+                } else {
+                    debugPanel.classList.remove('show');
+                    logPanel.classList.remove('show');
+                    this.log('🔍 デバッグ情報を非表示');
+                }
+            }
+            
+            toggleChart() {
+                this.chartVisible = !this.chartVisible;
+                
+                const chartPanel = document.getElementById('chartPanel');
+                const toggleBtn = document.getElementById('toggleChartBtn');
+                
+                if (this.chartVisible) {
+                    chartPanel.style.display = 'block';
+                    toggleBtn.textContent = '📈 グラフ非表示';
+                    this.initChart();
+                    this.log('📈 グラフパネルを表示');
+                } else {
+                    chartPanel.style.display = 'none';
+                    toggleBtn.textContent = '📈 グラフ表示';
+                    this.log('📈 グラフパネルを非表示');
+                }
+            }
+            
+            initChart() {
+                if (!this.chartVisible) return;
+                
+                const canvas = document.getElementById('workoutChart');
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+                
+                this.drawChart(ctx, canvas.width, canvas.height);
+            }
+            
+            drawChart(ctx, width, height) {
+                ctx.clearRect(0, 0, width, height);
+                
+                if (this.workoutData.time.length === 0) {
+                    ctx.fillStyle = '#666';
+                    ctx.font = '16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('ワークアウト開始後にデータが表示されます', width / 2, height / 2);
+                    return;
+                }
+                
+                const margin = 60;
+                const chartWidth = width - margin * 2;
+                const chartHeight = height - margin * 2;
+                
+                ctx.fillStyle = '#fafafa';
+                ctx.fillRect(0, 0, width, height);
+                
+                const maxSpeed = Math.max(...this.workoutData.speed, 30);
+                const maxPower = Math.max(...this.workoutData.power, 200);
+                const dataLength = this.workoutData.speed.length;
+                
+                // Y軸（左：速度）
+                ctx.fillStyle = '#4CAF50';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('速度 (km/h)', 20, height / 2);
+                
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'right';
+                for (let i = 0; i <= 5; i++) {
+                    const value = (maxSpeed / 5) * i;
+                    const y = height - margin - (chartHeight / 5) * i;
+                    ctx.fillText(value.toFixed(0), margin - 5, y + 3);
+                }
+                
+                // Y軸（右：パワー）
+                ctx.fillStyle = '#FF9800';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.save();
+                ctx.translate(width - 20, height / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText('パワー (W)', 0, 0);
+                ctx.restore();
+                
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'left';
+                for (let i = 0; i <= 5; i++) {
+                    const value = (maxPower / 5) * i;
+                    const y = height - margin - (chartHeight / 5) * i;
+                    ctx.fillText(value.toFixed(0), width - margin + 5, y + 3);
+                }
+                
+                // X軸（時間）
+                ctx.fillStyle = '#333';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                const timeSpan = dataLength > 0 ? (dataLength / 10) : 30;
+                for (let i = 0; i <= 10; i++) {
+                    const seconds = (timeSpan / 10) * i;
+                    const x = margin + (chartWidth / 10) * i;
+                    ctx.fillText(seconds.toFixed(0) + 's', x, height - margin + 15);
+                }
+                
+                // グリッド描画
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 1;
+                
+                for (let i = 0; i <= 10; i++) {
+                    const x = margin + (chartWidth / 10) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(x, margin);
+                    ctx.lineTo(x, height - margin);
+                    ctx.stroke();
+                }
+                
+                for (let i = 0; i <= 5; i++) {
+                    const y = margin + (chartHeight / 5) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(margin, y);
+                    ctx.lineTo(width - margin, y);
+                    ctx.stroke();
+                }
+                
+                // 軸線
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(margin, height - margin);
+                ctx.lineTo(width - margin, height - margin);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(margin, margin);
+                ctx.lineTo(margin, height - margin);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(width - margin, margin);
+                ctx.lineTo(width - margin, height - margin);
+                ctx.stroke();
+                
+                // 凡例
+                ctx.font = 'bold 12px Arial';
+                ctx.fillStyle = '#4CAF50';
+                ctx.fillRect(margin + 10, margin + 10, 15, 3);
+                ctx.fillText('速度', margin + 30, margin + 15);
+                
+                ctx.fillStyle = '#FF9800';
+                ctx.fillRect(margin + 80, margin + 10, 15, 3);
+                ctx.fillText('パワー', margin + 100, margin + 15);
+                
+                // データ描画（速度）
+                if (this.workoutData.speed.length > 1) {
+                    ctx.strokeStyle = '#4CAF50';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    
+                    for (let i = 0; i < this.workoutData.speed.length; i++) {
+                        const x = margin + (chartWidth / Math.max(this.workoutData.speed.length - 1, 1)) * i;
+                        const y = height - margin - (this.workoutData.speed[i] / maxSpeed) * chartHeight;
+                        
+                        if (i === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    }
+                    ctx.stroke();
+                }
+                
+                // データ描画（パワー）
+                if (this.workoutData.power.length > 1) {
+                    ctx.strokeStyle = '#FF9800';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    
+                    for (let i = 0; i < this.workoutData.power.length; i++) {
+                        const x = margin + (chartWidth / Math.max(this.workoutData.power.length - 1, 1)) * i;
+                        const y = height - margin - (this.workoutData.power[i] / maxPower) * chartHeight;
+                        
+                        if (i === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    }
+                    ctx.stroke();
+                }
+            }
+
+            updateConnectionButton() {
+                const btn = document.getElementById('connectionToggle');
+                if (this.isConnected) {
+                    btn.textContent = '❌ 切断';
+                    btn.classList.add('connected');
+                } else {
+                    btn.textContent = '🔗 接続';
+                    btn.classList.remove('connected');
+                }
+            }
+
+            async toggleConnection() {
+                if (this.isConnected) {
+                    await this.disconnect();
+                } else {
+                    await this.connect();
+                }
+            }
+            
+            async connect() {
+                try {
+                    this.log('🔍 Bluetoothデバイスを検索中...');
+                    
+                    this.device = await navigator.bluetooth.requestDevice({
+                        filters: [
+                            { services: [this.services.FITNESS_MACHINE] },
+                            { services: [this.services.CYCLING_POWER] },
+                            { services: [this.services.CYCLING_SPEED_CADENCE] }
+                        ],
+                        optionalServices: [
+                            this.services.FITNESS_MACHINE,
+                            this.services.CYCLING_POWER,
+                            this.services.CYCLING_SPEED_CADENCE
+                        ]
+                    });
+
+                    this.log(`✅ デバイス発見: ${this.device.name || 'Unknown Device'}`);
+                    
+                    this.device.addEventListener('gattserverdisconnected', () => {
+                        this.log('❌ デバイスが切断されました');
+                        this.updateStatus('切断されました');
+                        this.isConnected = false;
+                        this.updateConnectionButton();
+                    });
+
+                    this.server = await this.device.gatt?.connect();
+                    this.log('🔗 GATT サーバーに接続しました');
+                    
+                    await this.discoverServices();
+                    await this.setupControlPoint();
+                    
+                    this.isConnected = true;
+                    this.updateStatus(`接続済み: ${this.device.name}`, true);
+                    this.updateConnectionButton();
+                    
+                    // グラフを初期化して表示
+                    this.initChart();
+                    
+                    // 自動でデータ取得開始
+                    setTimeout(() => {
+                        this.startMonitoring();
+                    }, 1000);
+                    
+                } catch (error) {
+                    this.log(`❌ 接続エラー: ${error.message}`);
+                    this.updateStatus('接続エラー');
+                }
+            }
+
+            async setupControlPoint() {
+                try {
+                    const service = await this.server?.getPrimaryService(this.services.FITNESS_MACHINE);
+                    this.controlPoint = await service?.getCharacteristic(this.characteristics.FITNESS_MACHINE_CONTROL_POINT);
+                    
+                    // Control Pointの応答を監視
+                    await this.controlPoint?.startNotifications();
+                    this.controlPoint?.addEventListener('characteristicvaluechanged', (event) => {
+                        this.handleControlPointResponse(event.target.value);
+                    });
+                    
+                    this.log('🎛️ Control Point応答監視を開始');
+                } catch (error) {
+                    this.log(`⚠️ Control Point設定エラー: ${error.message}`);
+                }
+            }
+            
+            async requestControl() {
+                if (!this.controlPoint) {
+                    this.log('❌ Control Pointが利用できません');
+                    return false;
+                }
+                
+                try {
+                    const command = new Uint8Array(1);
+                    command[0] = 0x00; // OpCode 0x00: Request Control
+                    
+                    this.log('🎛️ 制御権要求送信中...');
+                    await this.controlPoint.writeValue(command);
+                    this.log('✅ 制御権要求送信完了');
+                    
+                    // 応答を待つ
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    return true;
+                } catch (error) {
+                    this.log(`❌ 制御権要求エラー: ${error.message}`);
+                    return false;
+                }
+            }
+            
+            async startResume() {
+                if (!this.controlPoint) {
+                    this.log('❌ Control Pointが利用できません');
+                    return false;
+                }
+                
+                try {
+                    const command = new Uint8Array(1);
+                    command[0] = 0x07; // OpCode 0x07: Start or Resume
+                    
+                    this.log('▶️ 開始コマンド送信中...');
+                    await this.controlPoint.writeValue(command);
+                    this.log('✅ 開始コマンド送信完了');
+                    
+                    // 応答を待つ
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    return true;
+                } catch (error) {
+                    this.log(`❌ 開始コマンドエラー: ${error.message}`);
+                    return false;
+                }
+            }
+
+            handleControlPointResponse(dataView) {
+                const responseCode = dataView.getUint8(0);
+                const requestOpCode = dataView.getUint8(1);
+                const resultCode = dataView.getUint8(2);
+                
+                const resultMap = {
+                    0x01: 'SUCCESS',
+                    0x02: 'NOT_SUPPORTED',
+                    0x03: 'INVALID_PARAMETER',
+                    0x04: 'OPERATION_FAILED',
+                    0x05: 'CONTROL_NOT_PERMITTED'
+                };
+                
+                const result = resultMap[resultCode] || `UNKNOWN(${resultCode})`;
+                this.log(`🎛️ Control Point応答: OpCode=${requestOpCode.toString(16)}, Result=${result}`);
+                
+                this.debugLog('debugControl', 
+                    `応答コード: 0x${responseCode.toString(16)}\n` +
+                    `要求OpCode: 0x${requestOpCode.toString(16)}\n` +
+                    `結果: ${result} (0x${resultCode.toString(16)})`);
+            }
+
+            async discoverServices() {
+                for (const [serviceName, serviceUuid] of Object.entries(this.services)) {
+                    try {
+                        const service = await this.server?.getPrimaryService(serviceUuid);
+                        this.log(`🔧 ${serviceName} サービスを発見`);
+                        
+                        const characteristics = await service?.getCharacteristics();
+                        for (const char of characteristics || []) {
+                            this.log(`  📡 特性: ${char.uuid.substring(4, 8)} (${this.getCharacteristicProperties(char)})`);
+                        }
+                    } catch (error) {
+                        this.log(`⚠️ ${serviceName} サービスが見つかりません`);
+                    }
+                }
+            }
+
+            getCharacteristicProperties(characteristic) {
+                const props = [];
+                if (characteristic.properties.read) props.push('READ');
+                if (characteristic.properties.write) props.push('WRITE');
+                if (characteristic.properties.notify) props.push('NOTIFY');
+                if (characteristic.properties.indicate) props.push('INDICATE');
+                return props.join(', ');
+            }
+
+            async startMonitoring() {
+                if (!this.server) {
+                    this.log('❌ デバイスが接続されていません');
+                    return;
+                }
+
+                this.isMonitoring = true;
+                this.startTime = Date.now();
+                this.log('▶️ データ監視を開始します...');
+
+                // 制御権要求とセットアップを追加
+                await this.requestControl();
+                await this.startResume();
+                
+                // データ監視開始
+                await this.monitorFitnessMachineData();
+                await this.monitorCyclingPowerData();
+                await this.monitorCSCData();
+            }
+
+            async monitorFitnessMachineData() {
+                try {
+                    const service = await this.server?.getPrimaryService(this.services.FITNESS_MACHINE);
+                    const characteristic = await service?.getCharacteristic(this.characteristics.INDOOR_BIKE_DATA);
+                    
+                    await characteristic?.startNotifications();
+                    characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+                        this.parseIndoorBikeData(event.target.value);
+                    });
+                    
+                    this.log('📊 Indoor Bike Data の通知を開始');
+                } catch (error) {
+                    this.log(`❌ Fitness Machine監視エラー: ${error.message}`);
+                }
+            }
+
+            async monitorCyclingPowerData() {
+                try {
+                    const service = await this.server?.getPrimaryService(this.services.CYCLING_POWER);
+                    const characteristic = await service?.getCharacteristic(this.characteristics.CYCLING_POWER_MEASUREMENT);
+                    
+                    await characteristic?.startNotifications();
+                    characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+                        this.parseCyclingPowerData(event.target.value);
+                    });
+                    
+                    this.log('⚡ Cycling Power の通知を開始');
+                } catch (error) {
+                    this.log(`❌ Cycling Power監視エラー: ${error.message}`);
+                }
+            }
+
+            async monitorCSCData() {
+                try {
+                    const service = await this.server?.getPrimaryService(this.services.CYCLING_SPEED_CADENCE);
+                    const characteristic = await service?.getCharacteristic(this.characteristics.CSC_MEASUREMENT);
+                    
+                    await characteristic?.startNotifications();
+                    characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+                        this.parseCSCData(event.target.value);
+                    });
+                    
+                    this.log('🚀 Speed & Cadence の通知を開始');
+                } catch (error) {
+                    this.log(`❌ Speed & Cadence監視エラー: ${error.message}`);
+                }
+            }
+
+            parseIndoorBikeData(dataView) {
+                // 生データをデバッグ表示
+                const rawBytes = new Uint8Array(dataView.buffer);
+                const hexString = this.bytesToHex(rawBytes);
+                
+                const flags = dataView.getUint16(0, true);
+                let offset = 2;
+                let debugInfo = `生データ: ${hexString}\nフラグ: 0x${flags.toString(16).padStart(4, '0')} (${flags.toString(2).padStart(16, '0')})\n\n`;
+                
+                try {
+                    // More Dataフラグ (bit 0)
+                    const hasMoreData = (flags & 0x01) !== 0;
+                    debugInfo += `More Data: ${hasMoreData}\n`;
+                    
+                    // Average Speedフラグ (bit 1)
+                    const hasAvgSpeed = (flags & 0x02) !== 0;
+                    debugInfo += `Average Speed: ${hasAvgSpeed}\n`;
+                    
+                    // Instantaneous Cadenceフラグ (bit 2)
+                    const hasInstCadence = (flags & 0x04) !== 0;
+                    debugInfo += `Instantaneous Cadence: ${hasInstCadence}\n`;
+                    
+                    // Average Cadenceフラグ (bit 3)
+                    const hasAvgCadence = (flags & 0x08) !== 0;
+                    debugInfo += `Average Cadence: ${hasAvgCadence}\n`;
+                    
+                    // Total Distanceフラグ (bit 4)
+                    const hasTotalDistance = (flags & 0x10) !== 0;
+                    debugInfo += `Total Distance: ${hasTotalDistance}\n`;
+                    
+                    // Resistance Levelフラグ (bit 5)
+                    const hasResistanceLevel = (flags & 0x20) !== 0;
+                    debugInfo += `Resistance Level: ${hasResistanceLevel}\n`;
+                    
+                    // Instantaneous Powerフラグ (bit 6)
+                    const hasInstPower = (flags & 0x40) !== 0;
+                    debugInfo += `Instantaneous Power: ${hasInstPower}\n`;
+                    
+                    // Average Powerフラグ (bit 7)
+                    const hasAvgPower = (flags & 0x80) !== 0;
+                    debugInfo += `Average Power: ${hasAvgPower}\n\n`;
+                    
+                    // Instantaneous Speed は常に存在
+                    if (offset + 2 <= dataView.byteLength) {
+                        const rawSpeed = dataView.getUint16(offset, true) * 0.01; // 0.01 km/h resolution
+                        
+                        // 速度履歴を更新
+                        this.speedHistory.push(rawSpeed);
+                        if (this.speedHistory.length > this.speedHistoryMaxLength) {
+                            this.speedHistory.shift();
+                        }
+                        
+                        // 短期間の移動平均を計算（より即応性の高い速度表示）
+                        const avgSpeed = this.speedHistory.reduce((sum, s) => sum + s, 0) / this.speedHistory.length;
+                        
+                        document.getElementById('speed').textContent = avgSpeed.toFixed(1);
+                        debugInfo += `Speed: ${avgSpeed.toFixed(1)} km/h (raw: ${rawSpeed.toFixed(1)}, avg of ${this.speedHistory.length} points)\n`;
+                        
+                        // ワークアウトデータに追加
+                        this.addWorkoutData('speed', avgSpeed);
+                        
+                        offset += 2;
+                    }
+                    
+                    // Average Speed
+                    if (hasAvgSpeed && offset + 2 <= dataView.byteLength) {
+                        const avgSpeed = dataView.getUint16(offset, true) * 0.01;
+                        debugInfo += `Avg Speed: ${avgSpeed.toFixed(1)} km/h\n`;
+                        offset += 2;
+                    }
+                    
+                    // Instantaneous Cadence
+                    if (hasInstCadence && offset + 2 <= dataView.byteLength) {
+                        const cadence = dataView.getUint16(offset, true) * 0.5; // 0.5 rpm resolution
+                        document.getElementById('cadence').textContent = cadence.toFixed(0);
+                        debugInfo += `Cadence: ${cadence.toFixed(0)} rpm (raw: ${dataView.getUint16(offset, true)})\n`;
+                        
+                        // ワークアウトデータに追加
+                        this.addWorkoutData('cadence', cadence);
+                        
+                        offset += 2;
+                    }
+                    
+                    // Average Cadence
+                    if (hasAvgCadence && offset + 2 <= dataView.byteLength) {
+                        const avgCadence = dataView.getUint16(offset, true) * 0.5;
+                        debugInfo += `Avg Cadence: ${avgCadence.toFixed(0)} rpm\n`;
+                        offset += 2;
+                    }
+                    
+                    // Total Distance
+                    if (hasTotalDistance && offset + 3 <= dataView.byteLength) {
+                        // 24bit値を読み取り
+                        const distanceMeters = (dataView.getUint8(offset) | 
+                                              (dataView.getUint8(offset + 1) << 8) | 
+                                              (dataView.getUint8(offset + 2) << 16)); // メートル単位
+                        
+                        // 常にm表記で表示
+                        document.getElementById('distance').textContent = distanceMeters;
+                        document.getElementById('distanceUnit').textContent = 'm';
+                        debugInfo += `Distance: ${distanceMeters} m (raw: ${dataView.getUint8(offset)} ${dataView.getUint8(offset + 1)} ${dataView.getUint8(offset + 2)})\n`;
+                        offset += 3;
+                    }
+                    
+                    // Resistance Level
+                    if (hasResistanceLevel && offset + 2 <= dataView.byteLength) {
+                        const resistanceLevel = dataView.getInt16(offset, true);
+                        debugInfo += `Resistance Level: ${resistanceLevel}\n`;
+                        offset += 2;
+                    }
+                    
+                    // Instantaneous Power
+                    if (hasInstPower && offset + 2 <= dataView.byteLength) {
+                        const power = dataView.getInt16(offset, true); // 1 W resolution
+                        if (power >= 0 && power <= 2000) { // 妥当な範囲のパワー値のみ表示
+                            this.updatePowerDisplay(power);
+                            debugInfo += `Power: ${power} W (raw: ${dataView.getInt16(offset, true)})\n`;
+                            
+                            // ワークアウトデータに追加
+                            this.addWorkoutData('power', power);
+                        } else {
+                            debugInfo += `Power: ${power} W (INVALID - 範囲外)\n`;
+                        }
+                        offset += 2;
+                    }
+                    
+                    // Average Power
+                    if (hasAvgPower && offset + 2 <= dataView.byteLength) {
+                        const avgPower = dataView.getInt16(offset, true);
+                        debugInfo += `Avg Power: ${avgPower} W\n`;
+                        offset += 2;
+                    }
+                    
+                } catch (error) {
+                    debugInfo += `\nパースエラー: ${error.message}`;
+                }
+                
+                this.debugLog('debugIndoorBike', debugInfo);
+            }
+
+            parseCyclingPowerData(dataView) {
+                const rawBytes = new Uint8Array(dataView.buffer);
+                const hexString = this.bytesToHex(rawBytes);
+                
+                const flags = dataView.getUint16(0, true);
+                const power = dataView.getInt16(2, true);
+                
+                if (power >= 0 && power <= 2000) {
+                    this.updatePowerDisplay(power);
+                }
+                
+                let debugInfo = `生データ: ${hexString}\n`;
+                debugInfo += `フラグ: 0x${flags.toString(16)}\n`;
+                debugInfo += `パワー: ${power} W\n`;
+                
+                this.debugLog('debugCyclingPower', debugInfo);
+            }
+
+            parseCSCData(dataView) {
+                const rawBytes = new Uint8Array(dataView.buffer);
+                const hexString = this.bytesToHex(rawBytes);
+                
+                const flags = dataView.getUint8(0);
+                let offset = 1;
+                let debugInfo = `生データ: ${hexString}\n`;
+                debugInfo += `フラグ: 0x${flags.toString(16)} (${flags.toString(2).padStart(8, '0')})\n`;
+                
+                if (flags & 0x01) { // Wheel revolution data present
+                    const wheelRevolutions = dataView.getUint32(offset, true);
+                    const wheelEventTime = dataView.getUint16(offset + 4, true);
+                    debugInfo += `Wheel: ${wheelRevolutions} revolutions, ${wheelEventTime} time\n`;
+                    offset += 6;
+                }
+                
+                if (flags & 0x02) { // Crank revolution data present
+                    const crankRevolutions = dataView.getUint16(offset, true);
+                    const crankEventTime = dataView.getUint16(offset + 2, true);
+                    debugInfo += `Crank: ${crankRevolutions} revolutions, ${crankEventTime} time\n`;
+                    
+                    const cadence = this.calculateCadence(crankRevolutions, crankEventTime);
+                    if (cadence >= 0) {
+                        document.getElementById('cadence').textContent = cadence.toFixed(0);
+                        debugInfo += `計算されたケイデンス: ${cadence.toFixed(0)} rpm\n`;
+                    }
+                }
+                
+                this.debugLog('debugCSC', debugInfo);
+            }
+
+            calculateCadence(crankRevolutions, crankEventTime) {
+                if (!this.lastCrankData) {
+                    this.lastCrankData = { revolutions: crankRevolutions, time: crankEventTime };
+                    return -1;
+                }
+                
+                const revDiff = crankRevolutions - this.lastCrankData.revolutions;
+                const timeDiff = (crankEventTime - this.lastCrankData.time) / 1024;
+                
+                if (timeDiff > 0 && revDiff >= 0) {
+                    const cadence = (revDiff * 60) / timeDiff;
+                    this.lastCrankData = { revolutions: crankRevolutions, time: crankEventTime };
+                    return cadence;
+                }
+                
+                return -1;
+            }
+
+            async setResistanceLevel(level) {
+                this.currentResistance = level;
+                document.getElementById('resistanceLevel').textContent = level;
+                document.getElementById('resistanceSlider').value = level;
+                
+                if (this.controlPoint) {
+                    await this.sendResistanceCommand(level);
+                }
+                
+                this.log(`🔧 負荷レベルを ${level} に設定しました`);
+            }
+
+            async sendResistanceCommand(resistanceLevel) {
+                if (!this.controlPoint) {
+                    this.log('❌ Control Pointが利用できません');
+                    return;
+                }
+
+                try {
+                    // OpCode 0x04: Set Target Resistance Level
+                    const command = new Uint8Array(3);
+                    command[0] = 0x04; // OpCode for Set Target Resistance Level
+                    command[1] = resistanceLevel & 0xFF; // Low byte
+                    command[2] = (resistanceLevel >> 8) & 0xFF; // High byte
+                    
+                    const hexString = this.bytesToHex(command);
+                    this.log(`📡 負荷コマンド送信: ${hexString}`);
+                    
+                    this.debugLog('debugControl', 
+                        `送信コマンド: ${hexString}\n` +
+                        `OpCode: 0x04 (Set Target Resistance Level)\n` +
+                        `レベル: ${resistanceLevel}\n` +
+                        `送信時刻: ${new Date().toLocaleTimeString()}`);
+                    
+                    await this.controlPoint.writeValue(command);
+                    this.log(`✅ 負荷コマンド送信完了: レベル ${resistanceLevel}`);
+                    
+                } catch (error) {
+                    this.log(`❌ 負荷設定エラー: ${error.message}`);
+                    this.debugLog('debugControl', `エラー: ${error.message}\n送信失敗時刻: ${new Date().toLocaleTimeString()}`);
+                }
+            }
+
+            addWorkoutData(type, value) {
+                if (!this.isMonitoring) return;
+                
+                this.workoutData[type].push(value);
+                this.workoutData.time.push(Date.now());
+                
+                // データポイント数制限
+                if (this.workoutData[type].length > this.maxDataPoints) {
+                    this.workoutData[type].shift();
+                    this.workoutData.time.shift();
+                }
+                
+                // グラフ更新（1秒ごと）
+                this.dataPoints++;
+                if (this.dataPoints % 10 === 0 && this.chartVisible) {
+                    this.initChart();
+                }
+            }
+
+            stopMonitoring() {
+                this.isMonitoring = false;
+                this.log('⏹️ データ監視を停止しました');
+                
+                // ワークアウト統計表示
+                if (this.workoutData.speed.length > 0) {
+                    const avgSpeed = this.workoutData.speed.reduce((a, b) => a + b, 0) / this.workoutData.speed.length;
+                    const maxSpeed = Math.max(...this.workoutData.speed);
+                    const avgPower = this.workoutData.power.reduce((a, b) => a + b, 0) / this.workoutData.power.length;
+                    const maxPower = Math.max(...this.workoutData.power);
+                    
+                    this.log(`📊 ワークアウト統計:`);
+                    this.log(`   平均速度: ${avgSpeed.toFixed(1)} km/h (最高: ${maxSpeed.toFixed(1)} km/h)`);
+                    this.log(`   平均パワー: ${avgPower.toFixed(0)} W (最高: ${maxPower.toFixed(0)} W)`);
+                }
+            }
+
+            async disconnect() {
+                if (this.device && this.device.gatt?.connected) {
+                    await this.device.gatt.disconnect();
+                }
+                this.device = null;
+                this.server = null;
+                this.controlPoint = null;
+                this.isConnected = false;
+                this.updateStatus('切断されました');
+                this.updateConnectionButton();
+                
+                // データリセット
+                this.workoutData = { time: [], speed: [], power: [], cadence: [] };
+                this.dataPoints = 0;
+                
+                this.log('❌ デバイスから切断しました');
+            }
+        }
+
+        // Web Bluetooth API サポートチェック
+        if (!navigator.bluetooth) {
+            document.body.innerHTML = `
+                <div class="container">
+                    <h1>❌ Web Bluetooth API 未サポート</h1>
+                    <p>このブラウザはWeb Bluetooth APIをサポートしていません。</p>
+                    <p>Chrome、Edge、またはOperaの最新版をお使いください。</p>
+                    <p>また、HTTPSまたはlocalhost環境が必要です。</p>
+                </div>
+            `;
+        } else {
+            // アプリケーション初期化
+            const bikeController = new FitnessBikeController();
+            
+            // グローバル関数
+            window.setResistance = function(level) {
+                bikeController.setResistanceLevel(level);
+            };
+        }
+    </script>
+</body>
+</html>

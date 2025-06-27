@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>フィットネスバイク接続アプリ</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background: #0056CC; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .data-display {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-family: 'Monaco', monospace;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.disconnected { background: #f8d7da; color: #721c24; }
+        .metric {
+            display: inline-block;
+            margin: 10px 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .resistance-control {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 2px solid #007AFF;
+        }
+        .slider-container {
+            margin: 15px 0;
+        }
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #007AFF;
+            cursor: pointer;
+        }
+        .slider::-moz-range-thumb {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #007AFF;
+            cursor: pointer;
+            border: none;
+        }
+        .resistance-display {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #007AFF;
+            margin: 10px 0;
+        }
+        .quick-buttons {
+            display: flex;
+            justify-content: space-around;
+            margin: 15px 0;
+        }
+        .quick-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .quick-btn:hover { background: #218838; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚴‍♂️ フィットネスバイク Web Bluetooth 接続</h1>
+        
+        <div id="status" class="status disconnected">
+            未接続 - バイクの電源を入れて「接続」ボタンを押してください
+        </div>
+
+        <div>
+            <button id="connectBtn">接続</button>
+            <button id="disconnectBtn" disabled>切断</button>
+            <button id="startBtn" disabled>データ取得開始</button>
+            <button id="stopBtn" disabled>データ取得停止</button>
+        </div>
+
+        <div id="resistanceControl" class="resistance-control" style="display: none;">
+            <h3>🔧 負荷調整 (Resistance Control)</h3>
+            <div class="resistance-display">
+                レベル <span id="resistanceLevel">1</span> / 80
+            </div>
+            <div class="slider-container">
+                <input type="range" min="1" max="80" value="1" class="slider" id="resistanceSlider">
+            </div>
+            <div class="quick-buttons">
+                <button class="quick-btn" onclick="setResistance(1)">軽い (1)</button>
+                <button class="quick-btn" onclick="setResistance(20)">普通 (20)</button>
+                <button class="quick-btn" onclick="setResistance(40)">重い (40)</button>
+                <button class="quick-btn" onclick="setResistance(60)">最重 (60)</button>
+            </div>
+        </div>
+
+        <div class="data-display">
+            <div class="metric">速度: <span id="speed">0</span> km/h</div>
+            <div class="metric">ケイデンス: <span id="cadence">0</span> rpm</div>
+            <div class="metric">パワー: <span id="power">0</span> W</div>
+            <div class="metric">距離: <span id="distance">0</span> km</div>
+        </div>
+
+        <div>
+            <h3>ログ:</h3>
+            <div id="log" style="height: 200px; overflow-y: scroll; background: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px;"></div>
+        </div>
+    </div>
+
+    <script>
+        class FitnessBikeController {
+            constructor() {
+                this.device = null;
+                this.server = null;
+                this.isMonitoring = false;
+                this.totalDistance = 0;
+                this.currentResistance = 1;
+                
+                // Bluetooth Services for fitness equipment
+                this.services = {
+                    FITNESS_MACHINE: '00001826-0000-1000-8000-00805f9b34fb',
+                    CYCLING_POWER: '00001818-0000-1000-8000-00805f9b34fb',
+                    CYCLING_SPEED_CADENCE: '00001816-0000-1000-8000-00805f9b34fb'
+                };
+                
+                // Characteristics
+                this.characteristics = {
+                    FITNESS_MACHINE_FEATURE: '00002acc-0000-1000-8000-00805f9b34fb',
+                    INDOOR_BIKE_DATA: '00002ad2-0000-1000-8000-00805f9b34fb',
+                    FITNESS_MACHINE_CONTROL_POINT: '00002ad9-0000-1000-8000-00805f9b34fb',
+                    CYCLING_POWER_MEASUREMENT: '00002a63-0000-1000-8000-00805f9b34fb',
+                    CSC_MEASUREMENT: '00002a5b-0000-1000-8000-00805f9b34fb'
+                };
+                
+                this.initializeEventListeners();
+            }
+
+            initializeEventListeners() {
+                document.getElementById('connectBtn').addEventListener('click', () => this.connect());
+                document.getElementById('disconnectBtn').addEventListener('click', () => this.disconnect());
+                document.getElementById('startBtn').addEventListener('click', () => this.startMonitoring());
+                document.getElementById('stopBtn').addEventListener('click', () => this.stopMonitoring());
+                
+                // 負荷調整スライダー
+                document.getElementById('resistanceSlider').addEventListener('input', (e) => {
+                    this.setResistanceLevel(parseInt(e.target.value));
+                });
+            }
+
+            log(message) {
+                const logElement = document.getElementById('log');
+                const timestamp = new Date().toLocaleTimeString();
+                logElement.innerHTML += `[${timestamp}] ${message}\n`;
+                logElement.scrollTop = logElement.scrollHeight;
+                console.log(message);
+            }
+
+            updateStatus(message, isConnected = false) {
+                const statusElement = document.getElementById('status');
+                statusElement.textContent = message;
+                statusElement.className = `status ${isConnected ? 'connected' : 'disconnected'}`;
+            }
+
+            async connect() {
+                try {
+                    this.log('Bluetoothデバイスを検索中...');
+                    
+                    this.device = await navigator.bluetooth.requestDevice({
+                        filters: [
+                            { services: [this.services.FITNESS_MACHINE] },
+                            { services: [this.services.CYCLING_POWER] },
+                            { services: [this.services.CYCLING_SPEED_CADENCE] }
+                        ],
+                        optionalServices: [
+                            this.services.FITNESS_MACHINE,
+                            this.services.CYCLING_POWER,
+                            this.services.CYCLING_SPEED_CADENCE
+                        ]
+                    });
+
+                    this.log(`デバイス発見: ${this.device.name || 'Unknown Device'}`);
+                    
+                    this.device.addEventListener('gattserverdisconnected', () => {
+                        this.log('デバイスが切断されました');
+                        this.updateStatus('切断されました');
+                        this.updateButtonStates(false);
+                    });
+
+                    this.server = await this.device.gatt?.connect();
+                    this.log('GATT サーバーに接続しました');
+                    
+                    await this.discoverServices();
+                    
+                    this.updateStatus(`接続済み: ${this.device.name}`, true);
+                    this.updateButtonStates(true);
+                    
+                    // 負荷調整UIを表示
+                    document.getElementById('resistanceControl').style.display = 'block';
+                    
+                    // 自動でデータ取得開始
+                    setTimeout(() => {
+                        this.startMonitoring();
+                    }, 1000);
+                    
+                } catch (error) {
+                    this.log(`接続エラー: ${error.message}`);
+                    this.updateStatus('接続エラー');
+                }
+            }
+
+            async discoverServices() {
+                for (const [serviceName, serviceUuid] of Object.entries(this.services)) {
+                    try {
+                        const service = await this.server?.getPrimaryService(serviceUuid);
+                        this.log(`${serviceName} サービスを発見`);
+                        
+                        const characteristics = await service?.getCharacteristics();
+                        for (const char of characteristics || []) {
+                            this.log(`  特性: ${char.uuid} (プロパティ: ${this.getCharacteristicProperties(char)})`);
+                        }
+                    } catch (error) {
+                        this.log(`${serviceName} サービスが見つかりません`);
+                    }
+                }
+            }
+
+            getCharacteristicProperties(characteristic) {
+                const props = [];
+                if (characteristic.properties.read) props.push('READ');
+                if (characteristic.properties.write) props.push('WRITE');
+                if (characteristic.properties.notify) props.push('NOTIFY');
+                if (characteristic.properties.indicate) props.push('INDICATE');
+                return props.join(', ');
+            }
+
+            async startMonitoring() {
+                if (!this.server) {
+                    this.log('デバイスが接続されていません');
+                    return;
+                }
+
+                this.isMonitoring = true;
+                this.log('データ監視を開始します...');
+                
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+
+                // Fitness Machine Service のデータを監視
+                await this.monitorFitnessMachineData();
+                
+                // Cycling Power Service のデータを監視
+                await this.monitorCyclingPowerData();
+                
+                // Cycling Speed & Cadence Service のデータを監視
+                await this.monitorCSCData();
+            }
+
+            async monitorFitnessMachineData() {
+                try {
+                    const service = await this.server?.getPrimaryService(this.services.FITNESS_MACHINE);
+                    const characteristic = await service?.getCharacteristic(this.characteristics.INDOOR_BIKE_DATA);
+                    
+                    await characteristic?.startNotifications();
+                    characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+                        this.parseIndoorBikeData(event.target.value);
+                    });
+                    
+                    this.log('Indoor Bike Data の通知を開始');
+                } catch (error) {
+                    this.log(`Fitness Machine監視エラー: ${error.message}`);
+                }
+            }
+
+            async monitorCyclingPowerData() {
+                try {
+                    const service = await this.server?.getPrimaryService(this.services.CYCLING_POWER);
+                    const characteristic = await service?.getCharacteristic(this.characteristics.CYCLING_POWER_MEASUREMENT);
+                    
+                    await characteristic?.startNotifications();
+                    characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+                        this.parseCyclingPowerData(event.target.value);
+                    });
+                    
+                    this.log('Cycling Power の通知を開始');
+                } catch (error) {
+                    this.log(`Cycling Power監視エラー: ${error.message}`);
+                }
+            }
+
+            async monitorCSCData() {
+                try {
+                    const service = await this.server?.getPrimaryService(this.services.CYCLING_SPEED_CADENCE);
+                    const characteristic = await service?.getCharacteristic(this.characteristics.CSC_MEASUREMENT);
+                    
+                    await characteristic?.startNotifications();
+                    characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+                        this.parseCSCData(event.target.value);
+                    });
+                    
+                    this.log('Speed & Cadence の通知を開始');
+                } catch (error) {
+                    this.log(`Speed & Cadence監視エラー: ${error.message}`);
+                }
+            }
+
+            parseIndoorBikeData(dataView) {
+                const flags = dataView.getUint16(0, true);
+                let offset = 2;
+                
+                // Speed (0.01 km/h resolution)
+                if (flags & 0x01) {
+                    const speed = dataView.getUint16(offset, true) * 0.01;
+                    document.getElementById('speed').textContent = speed.toFixed(1);
+                    offset += 2;
+                }
+                
+                // Cadence (0.5 rpm resolution)
+                if (flags & 0x02) {
+                    const cadence = dataView.getUint16(offset, true) * 0.5;
+                    document.getElementById('cadence').textContent = cadence.toFixed(0);
+                    offset += 2;
+                }
+                
+                // Power (1 W resolution)
+                if (flags & 0x04) {
+                    const power = dataView.getInt16(offset, true);
+                    document.getElementById('power').textContent = power;
+                    offset += 2;
+                }
+                
+                // Distance (1 m resolution)
+                if (flags & 0x08) {
+                    const distance = dataView.getUint24(offset, true) / 1000; // Convert to km
+                    document.getElementById('distance').textContent = distance.toFixed(2);
+                    offset += 3;
+                }
+            }
+
+            parseCyclingPowerData(dataView) {
+                const flags = dataView.getUint16(0, true);
+                const power = dataView.getInt16(2, true);
+                document.getElementById('power').textContent = power;
+            }
+
+            parseCSCData(dataView) {
+                const flags = dataView.getUint8(0);
+                let offset = 1;
+                
+                if (flags & 0x01) { // Wheel revolution data present
+                    const wheelRevolutions = dataView.getUint32(offset, true);
+                    const wheelEventTime = dataView.getUint16(offset + 4, true);
+                    offset += 6;
+                }
+                
+                if (flags & 0x02) { // Crank revolution data present
+                    const crankRevolutions = dataView.getUint16(offset, true);
+                    const crankEventTime = dataView.getUint16(offset + 2, true);
+                    const cadence = this.calculateCadence(crankRevolutions, crankEventTime);
+                    if (cadence >= 0) {
+                        document.getElementById('cadence').textContent = cadence.toFixed(0);
+                    }
+                }
+            }
+
+            calculateCadence(crankRevolutions, crankEventTime) {
+                if (!this.lastCrankData) {
+                    this.lastCrankData = { revolutions: crankRevolutions, time: crankEventTime };
+                    return -1;
+                }
+                
+                const revDiff = crankRevolutions - this.lastCrankData.revolutions;
+                const timeDiff = (crankEventTime - this.lastCrankData.time) / 1024; // Convert to seconds
+                
+                if (timeDiff > 0) {
+                    const cadence = (revDiff * 60) / timeDiff; // rpm
+                    this.lastCrankData = { revolutions: crankRevolutions, time: crankEventTime };
+                    return cadence;
+                }
+                
+                return -1;
+            }
+
+            stopMonitoring() {
+                this.isMonitoring = false;
+                this.log('データ監視を停止しました');
+                
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+            }
+
+            async disconnect() {
+                if (this.device && this.device.gatt?.connected) {
+                    await this.device.gatt.disconnect();
+                }
+                this.device = null;
+                this.server = null;
+                this.updateStatus('切断されました');
+                this.updateButtonStates(false);
+                this.log('デバイスから切断しました');
+            }
+
+            async setResistanceLevel(level) {
+                this.currentResistance = level;
+                document.getElementById('resistanceLevel').textContent = level;
+                document.getElementById('resistanceSlider').value = level;
+                
+                if (this.server) {
+                    await this.sendResistanceCommand(level);
+                }
+                
+                this.log(`負荷レベルを ${level} に設定しました`);
+            }
+
+            async sendResistanceCommand(resistanceLevel) {
+                try {
+                    const service = await this.server?.getPrimaryService(this.services.FITNESS_MACHINE);
+                    const controlPoint = await service?.getCharacteristic(this.characteristics.FITNESS_MACHINE_CONTROL_POINT);
+                    
+                    // FTMS Resistance Level Control Command
+                    // OpCode: 0x04 (Set Target Resistance Level)
+                    // Parameter: resistance level (0.1 unit increments)
+                    const command = new Uint8Array(3);
+                    command[0] = 0x04; // OpCode for Set Target Resistance Level
+                    command[1] = resistanceLevel & 0xFF; // Low byte
+                    command[2] = (resistanceLevel >> 8) & 0xFF; // High byte
+                    
+                    await controlPoint?.writeValue(command);
+                    this.log(`負荷設定コマンドを送信: レベル ${resistanceLevel}`);
+                    
+                } catch (error) {
+                    this.log(`負荷設定エラー: ${error.message}`);
+                    // Alternative: Try power target command
+                    await this.sendPowerTargetCommand(resistanceLevel * 10); // Convert to watts
+                }
+            }
+
+            async sendPowerTargetCommand(watts) {
+                try {
+                    const service = await this.server?.getPrimaryService(this.services.FITNESS_MACHINE);
+                    const controlPoint = await service?.getCharacteristic(this.characteristics.FITNESS_MACHINE_CONTROL_POINT);
+                    
+                    // FTMS Set Target Power Command
+                    // OpCode: 0x05 (Set Target Power)
+                    const command = new Uint8Array(3);
+                    command[0] = 0x05; // OpCode for Set Target Power
+                    command[1] = watts & 0xFF; // Low byte
+                    command[2] = (watts >> 8) & 0xFF; // High byte
+                    
+                    await controlPoint?.writeValue(command);
+                    this.log(`パワー目標設定コマンドを送信: ${watts}W`);
+                    
+                } catch (error) {
+                    this.log(`パワー設定エラー: ${error.message}`);
+                }
+            }
+
+            updateButtonStates(connected) {
+                document.getElementById('connectBtn').disabled = connected;
+                document.getElementById('disconnectBtn').disabled = !connected;
+                document.getElementById('startBtn').disabled = !connected;
+                document.getElementById('stopBtn').disabled = true;
+                
+                // 負荷調整UIの表示/非表示
+                if (!connected) {
+                    document.getElementById('resistanceControl').style.display = 'none';
+                }
+            }
+        }
+
+        // Web Bluetooth API サポートチェック
+        if (!navigator.bluetooth) {
+            document.body.innerHTML = `
+                <div class="container">
+                    <h1>❌ Web Bluetooth API 未サポート</h1>
+                    <p>このブラウザはWeb Bluetooth APIをサポートしていません。</p>
+                    <p>Chrome、Edge、またはOperaの最新版をお使いください。</p>
+                    <p>また、HTTPSまたはlocalhost環境が必要です。</p>
+                </div>
+            `;
+        } else {
+            // アプリケーション初期化
+            const bikeController = new FitnessBikeController();
+            
+            // グローバル関数として負荷設定関数を定義
+            window.setResistance = function(level) {
+                bikeController.setResistanceLevel(level);
+            };
+        }
+    </script>
+</body>
+</html>
